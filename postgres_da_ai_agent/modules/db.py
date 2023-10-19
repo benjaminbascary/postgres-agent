@@ -71,4 +71,4 @@ class PostgresDB:
 
     def get_table_definitions_for_prompt(self):
         table_names = self.get_all_table_names()
-        return "\n".join([self.get_table_definitions(table_name) for table_name in table_names])
+        return "\n".join([self.get_table_definitions(table_name)[0] for table_name in table_names])
