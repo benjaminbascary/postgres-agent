@@ -14,9 +14,15 @@ assert os.environ.get(
 DB_URL = os.environ.get("DATABASE_URL")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
+
 def main():
 
     # parse prompt param using arg parse
+    with PostgresDB() as db:
+        db.connect_with_url(DB_URL)
+        locations_table = db.get_all("location")
+
+        print("locations", locations_table)
 
     # connect to postgres db with statement and create a db_manager class
 
@@ -28,11 +34,6 @@ def main():
 
     # parse sql response from prompt_response using SQL_QUERY_DELIMITER '-----------'
 
-    with PostgresDB() as db:
-        db.connect_with_url(DB_URL)
-        users_table = db.get_all("location")
-
-        print("users_table", users_table)
 
 if __name__ == "__main__":
     main()
