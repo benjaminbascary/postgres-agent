@@ -19,6 +19,7 @@ POSTGRES_TABLE_DEFINITIONS_CAP_REF = "TABLE_DEFINITIONS"
 TABLE_RESPONSE_FORMAT_CAP_REF = "TABLE_RESPONSE_FORMAT"
 
 SQL_QUERY_DELIMITER = '-----------'
+AGENT_RESULT_DELIMITER = '-------- AGENT RESULT --------'
 
 
 def main():
@@ -34,30 +35,35 @@ def main():
 
     prompt_with_table_definitions = llm.add_cap_ref(
         prompt,
-        f"Use these {TABLE_RESPONSE_FORMAT_CAP_REF} to satisfy the database query.",
-        POSTGRES_TABLE_DEFINITIONS_CAP_REF,
-        table_definitions)
+        f"""
+            Response in this format {TABLE_RESPONSE_FORMAT_CAP_REF}.
 
-    prompt_with_table_definitions = llm.add_cap_ref(
-        prompt_with_table_definitions,
-        f"Response in this format {TABLE_RESPONSE_FORMAT_CAP_REF}",
+            Here are the table definitions:
+
+            {table_definitions}
+
+            Limit to the instructions so the response is always in the same.
+            Please don't add any new lines or new sections. Just and explanation,
+            a delimiter and the sql query.
+        """,
         TABLE_RESPONSE_FORMAT_CAP_REF,
         f"""
-            <explanation of the sql query>
+            <Here goes the explanation of the sql query>
             {SQL_QUERY_DELIMITER}
-            <sql query exclusively as raw text>
+            <sql query exclusively as raw text: Example: SELECT * FROM table WHERE.. etc etc>
         """
     )
 
     prompt_response = llm.prompt(prompt_with_table_definitions)
 
     sql_response = prompt_response.split(SQL_QUERY_DELIMITER)[1]
-    print("Prompt Response: ", prompt_response)
-    print("Sql Response: ", sql_response)
+
+    print(prompt_response)
+
     db.connect_with_url(DB_URL)
     result = db.run_sql(sql_response)
 
-    print("-------- AGENT RESULT --------")
+    print(AGENT_RESULT_DELIMITER)
 
     print(result)
 
