@@ -15,24 +15,24 @@ DB_URL = os.environ.get("DATABASE_URL")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 
-def main():
+import argparse
 
-    # parse prompt param using arg parse
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("prompt", help="The prompt for the AI model")
+    args = parser.parse_args()
+
     with PostgresDB() as db:
         db.connect_with_url(DB_URL)
-        locations_table = db.get_all("location")
+        table_definitions = db.get_table_definitions_for_prompt()
 
-        print("locations", locations_table)
+    prompt_with_table_definitions = llm.add_cap_ref(args.prompt, "Here are the table definitions:", "TABLE_DEFINITIONS", table_definitions)
+    prompt_response = llm.prompt(prompt_with_table_definitions)
 
-    # connect to postgres db with statement and create a db_manager class
+    SQL_QUERY_DELIMITER = '-----------'
+    sql_response = prompt_response.split(SQL_QUERY_DELIMITER)[1]
 
-    # call db_manager.get_table_definition_for_prompt() to get tables in promt ready form
-
-    # create two blank calls to llm.add_cap_ref() that update our current prompt passed in from cli
-
-    # call llm.prompt to get a prompt_response variable
-
-    # parse sql response from prompt_response using SQL_QUERY_DELIMITER '-----------'
+    print("SQL Response:", sql_response)
 
 
 if __name__ == "__main__":
