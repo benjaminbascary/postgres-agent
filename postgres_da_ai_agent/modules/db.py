@@ -55,7 +55,9 @@ class PostgresDB:
 
     def run_sql(self, sql):
         self.cur.execute(sql)
-        return self.cur.fetchall()
+        result = self.cur.fetchall()
+        formatted_result = "\n".join("\t".join(str(item) for item in row) for row in result)
+        return formatted_result
 
     def get_table_definitions(self, table_name):
         self.cur.execute("""
