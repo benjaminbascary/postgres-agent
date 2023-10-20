@@ -96,7 +96,7 @@ def main():
     )
 
     PRODUCT_MANAGER_PROMPT = (
-        "A Product Manager. You validate the response to make sure it is correct. You review the response and approve the execution result." + COMPLETION_PROMPT
+        "A Product Manager. You validate the response to make sure it is correct. You review the response, check carefully if the response fits the desired request from the admin and approve the execution result." + COMPLETION_PROMPT
     )
 
     admin_user_proxy_agent = UserProxyAgent(
@@ -140,7 +140,8 @@ def main():
     manager = GroupChatManager(
         groupchat=groupchat, llm_config=gpt4_config)
 
-    admin_user_proxy_agent.initiate_chat(manager, clear_history=True, message=prompt)
+    admin_user_proxy_agent.initiate_chat(
+        manager, clear_history=True, message=prompt)
 
 
 if __name__ == "__main__":
