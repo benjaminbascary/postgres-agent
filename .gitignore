@@ -3,3 +3,6 @@
 .aider*
 .vscode
 vscode
+postgres_da_ai_agent/__pycache__/main.cpython-311.pyc
+postgres_da_ai_agent/modules/__pycache__/llm.cpython-311.pyc
+postgres_da_ai_agent/modules/__pycache__/db.cpython-311.pyc
