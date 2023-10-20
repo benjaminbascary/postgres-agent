@@ -1,5 +1,7 @@
 import psycopg2
 from psycopg2 import sql
+import json
+import datetime
 
 
 class PostgresDB:
@@ -15,6 +17,11 @@ class PostgresDB:
             self.cur.close()
         if self.conn:
             self.conn.close()
+
+    def datetime_handler(self, obj):
+        if isinstance(obj, datetime.datetime):
+            return obj.isoformat()
+        raise TypeError("Type not serializable")
 
     def connect_with_url(self, url):
         self.conn = psycopg2.connect(url)
@@ -55,7 +62,17 @@ class PostgresDB:
 
     def run_sql(self, sql):
         self.cur.execute(sql)
-        return self.cur.fetchall()
+        column_names = [desc[0] for desc in self.cur.description]
+        result = self.cur.fetchall()
+
+        # Convert rows to dictionaries
+        dict_result = [dict(zip(column_names, row)) for row in result]
+
+        # Convert list of dictionaries to JSON with custom datetime handler
+        formatted_result = json.dumps(
+            dict_result, indent=4, default=self.datetime_handler)
+
+        return formatted_result
 
     def get_table_definitions(self, table_name):
         self.cur.execute("""
@@ -108,7 +125,7 @@ class PostgresDB:
             for column in columns:
                 col_name, data_type, is_nullable, col_default = column
                 result.append(
-                    f"    {col_name} ({data_type}), Nullable: {is_nullable}, Default: {col_default}")
+                    f"    {col_name} ({data_type})")
 
             # Add foreign key relationships
             fks = self.get_foreign_keys(table_name)
