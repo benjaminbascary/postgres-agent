@@ -139,10 +139,9 @@ def main():
                                   sr_data_analyst_agent, product_manager_agent], messages=[], max_round=10)
     manager = GroupChatManager(
         groupchat=groupchat, llm_config=gpt4_config)
-    
+
     admin_user_proxy_agent.initiate_chat(manager, clear_history=True, message=prompt)
 
 
 if __name__ == "__main__":
     main()
-    db.__exit__(None, None, None)
