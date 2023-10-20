@@ -34,9 +34,9 @@ def main():
     parser.add_argument("--prompt", help="The prompt for the AI model")
     args = parser.parse_args()
 
-    with PostgresDB() as db:
-        db.connect_with_url(DB_URL)
-        table_definitions = db.get_table_definitions_for_prompt()
+    db = PostgresDB()
+    db.connect_with_url(DB_URL)
+    table_definitions = db.get_table_definitions_for_prompt()
 
     prompt = args.prompt
 
