@@ -108,7 +108,7 @@ class PostgresDB:
             for column in columns:
                 col_name, data_type, is_nullable, col_default = column
                 result.append(
-                    f"    {col_name} ({data_type}), Nullable: {is_nullable}, Default: {col_default}")
+                    f"    {col_name} ({data_type})")
 
             # Add foreign key relationships
             fks = self.get_foreign_keys(table_name)
