@@ -1,14 +1,14 @@
 import os
 import dotenv
 import argparse
+from postgres_da_ai_agent.modules.orchestrator import Orchestrator
 from postgres_da_ai_agent.modules.db import PostgresDB
-from postgres_da_ai_agent.modules import llm
+from postgres_da_ai_agent.modules import llm, file
 from autogen import (
     AssistantAgent,
     UserProxyAgent,
     GroupChat,
     GroupChatManager,
-    config_list_from_json,
     config_list_from_models,
 )
 
@@ -23,10 +23,9 @@ DB_URL = os.environ.get("DATABASE_URL")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
 
 POSTGRES_TABLE_DEFINITIONS_CAP_REF = "TABLE_DEFINITIONS"
-TABLE_RESPONSE_FORMAT_CAP_REF = "TABLE_RESPONSE_FORMAT"
 
-SQL_QUERY_DELIMITER = '-----------'
-AGENT_RESULT_DELIMITER = '-------- AGENT RESULT --------'
+AGENT_TEAM_NAME = "::: 🤖 Postgres Data Analytics Multi-Agent Team 🤖 :::"
+VIZ_AGENT_TEAM_NAME = "::: 🤖 Postgres Data Analytics Viz Team 🤖 :::"
 
 
 def main():
@@ -47,11 +46,16 @@ def main():
         table_definitions,
     )
 
-    gpt4_config = {
+    base_config = {
         "use_cache": False,
         "temperature": 0,
         "config_list": config_list_from_models(["gpt-4"]),
         "request_timeout": 120,
+    }
+
+    # run sql configuratiom
+    gpt4_config = {
+        **base_config,
         "functions": [
             {
                 "name": "run_sql",
@@ -70,8 +74,96 @@ def main():
         ]
     }
 
+    # write file configuration
+
+    write_file_config = {
+        **base_config,
+        "functions": [
+            {
+                "name": "write_file",
+                "description": "Write text to a file",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_name": {
+                            "type": "string",
+                            "description": "File name to write to",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Text to write to the file",
+                        },
+                    },
+                    "required": ["file_name", "content"],
+                }
+            }
+        ]
+    }
+
+    # write json file configuration
+
+    write_json_file_config = {
+        **base_config,
+        "functions": [
+            {
+                "name": "write_json_file",
+                "description": "Write json to a file",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_name": {
+                            "type": "string",
+                            "description": "File name to write to",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Json to write to the file",
+                        },
+                    },
+                    "required": ["file_name", "content"],
+                }
+            }
+        ]
+    }
+
+    write_yml_file_config = {
+        **base_config,
+        "functions": [
+            {
+                "name": "write_yml_file",
+                "description": "Write yml to a file",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "file_name": {
+                            "type": "string",
+                            "description": "File name to write to",
+                        },
+                        "content": {
+                            "type": "string",
+                            "description": "Yml to write to the file",
+                        },
+                    },
+                    "required": ["file_name", "content"],
+                }
+            }
+        ]
+    }
+
     function_map = {
         "run_sql": db.run_sql
+    }
+
+    write_file_function_map = {
+        "write_file": file.write_file
+    }
+
+    write_json_file_function_map = {
+        "write_json_file": file.write_json_file
+    }
+
+    write_yml_file_function_map = {
+        "write_yml_file": file.write_yml_file
     }
 
     def in_termination_msg(content):
@@ -94,6 +186,10 @@ def main():
     PRODUCT_MANAGER_PROMPT = (
         "A Product Manager. You validate the response to make sure it is correct. You review the response, check carefully if the response fits the desired request from the admin and approve the execution result. Finally create a natural language response based on the results of the query that generates de Data Analyst and follow the next instruction: " + COMPLETION_PROMPT
     )
+
+    """
+        Sequential agents
+    """
 
     admin_user_proxy_agent = UserProxyAgent(
         name="Admin",
@@ -131,13 +227,72 @@ def main():
         is_termination_msg=in_termination_msg,
     )
 
-    groupchat = GroupChat(agents=[admin_user_proxy_agent, data_engineer_agent,
-                                  sr_data_analyst_agent, product_manager_agent], messages=[], max_round=10)
-    manager = GroupChatManager(
-        groupchat=groupchat, llm_config=gpt4_config)
+    data_engineering_agents = [
+        admin_user_proxy_agent,
+        data_engineer_agent,
+        sr_data_analyst_agent,
+        product_manager_agent,
+    ]
 
-    admin_user_proxy_agent.initiate_chat(
-        manager, clear_history=True, message=prompt)
+    data_engineer_agent_orchestrator = Orchestrator(
+        name=AGENT_TEAM_NAME,
+        agents=data_engineering_agents,
+    )
+
+    success, data_engineer_messages = data_engineer_agent_orchestrator.sequential_conversation(
+        prompt)
+    
+    print(data_engineer_messages)
+
+    data_analyst_result = data_engineer_messages[-2]["content"]
+
+    """
+        Broadcasting agents
+    """
+
+    TEXT_REPORT_ANALYSIS_PROMPT = "Text file Report Analyst. You exclusively use the write_file function on a summarized report."
+    JSON_REPORT_ANALYSIS_PROMPT = "JSON file Report Analyst. You exclusively use the write_json_file function on a the report."
+    YML_REPORT_ANALYSIS_PROMPT = "YML file Report Analyst. You exclusively use the write_yml_file function on a the report."
+
+    text_report_agent = AssistantAgent(
+        name="Text_Report_Analyst",
+        llm_config=write_file_config,
+        system_message=TEXT_REPORT_ANALYSIS_PROMPT,
+        human_input_mode="NEVER",
+        function_map=write_file_function_map
+    )
+
+    json_report_agent = AssistantAgent(
+        name="JSON_Report_Analyst",
+        llm_config=write_json_file_config,
+        system_message=JSON_REPORT_ANALYSIS_PROMPT,
+        human_input_mode="NEVER",
+        function_map=write_json_file_function_map
+    )
+
+    yml_report_agent = AssistantAgent(
+        name="YML_Report_Analyst",
+        llm_config=write_yml_file_config,
+        system_message=YML_REPORT_ANALYSIS_PROMPT,
+        human_input_mode="NEVER",
+        function_map=write_yml_file_function_map
+    )
+
+    data_viz_agents = [
+        admin_user_proxy_agent,
+        text_report_agent,
+        json_report_agent,
+        yml_report_agent,
+    ]
+
+    data_viz_orchestrator = Orchestrator(
+        name=VIZ_AGENT_TEAM_NAME,
+        agents=data_viz_agents,
+    )
+
+    data_viz_prompt = f"Here is the data to report: {data_analyst_result}"
+
+    data_viz_orchestrator.broadcast_conversation(data_viz_prompt)
 
 
 if __name__ == "__main__":
