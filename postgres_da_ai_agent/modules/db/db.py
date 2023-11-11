@@ -65,14 +65,15 @@ class PostgresDB:
         column_names = [desc[0] for desc in self.cur.description]
         result = self.cur.fetchall()
 
-        # Convert rows to dictionaries
-        dict_result = [dict(zip(column_names, row)) for row in result]
+        # # Convert rows to dictionaries
+        # dict_result = [dict(zip(column_names, row)) for row in result]
 
-        # Convert list of dictionaries to JSON with custom datetime handler
-        formatted_result = json.dumps(
-            dict_result, indent=4, default=self.datetime_handler)
+        # # Convert list of dictionaries to JSON with custom datetime handler
+        # formatted_result = json.dumps(
+        #     dict_result, indent=4, default=self.datetime_handler)
 
-        return formatted_result
+        # return formatted_result
+        return result
 
     def get_table_definitions(self, table_name):
         self.cur.execute("""

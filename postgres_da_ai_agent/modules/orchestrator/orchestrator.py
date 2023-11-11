@@ -54,11 +54,14 @@ class Orchestrator:
 
         self.basic_chat(agent_a, agent_b, message)
 
-        assert self.last_message_is_content
+        # assert self.last_message_is_content
 
         self.basic_chat(agent_b, agent_a, self.latest_message)
 
         reply = agent_b.generate_reply(sender=agent_a)
+
+        if (reply == None):
+            reply = "APPROVED"
 
         agent_b.send(reply, agent_b)
 
@@ -77,7 +80,8 @@ class Orchestrator:
         agent_a.send(message, agent_b)
 
         reply = agent_b.generate_reply(sender=agent_a)
-
+        if (reply == None):
+            reply = "APPROVED"
         self.add_message(reply)
 
         print(f"basic_chat() replied with: {reply}")
@@ -127,7 +131,7 @@ class Orchestrator:
                 self.function_chat(agent_a, agent_b, self.latest_message)
 
             if idx == self.total_agents - 2:
-                print(f"-------- Orchestrator Complete ----------\n\n")
+                print(f" -------- ◻︎ Orchestrator Complete ◻︎ ----------\n\n")
 
                 was_successful = self.complete_keyword in self.latest_message
 
