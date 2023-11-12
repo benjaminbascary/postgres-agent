@@ -1,0 +1,9 @@
+The SQL query was executed successfully. Here are the results:
+
+1. Program ID: bc9d617f-9197-41f8-ba94-277fe32db37a, Program Name: Programa test 2
+2. Program ID: 34e5874d-41a9-4182-98c4-21c2be2b504f, Program Name: test test
+3. Program ID: a0431b81-aff5-485d-9606-aad136f012ad, Program Name: Programa test
+4. Program ID: 37f82d94-1ab5-425c-aedd-51c53b40b977, Program Name: Programa de Benja
+5. Program ID: 03b90a4c-7e37-40f5-a168-4dd5842ea37a, Program Name: RN Radio
+
+Please let me know if you need any further assistance.

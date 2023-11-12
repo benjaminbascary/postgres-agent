@@ -2,6 +2,7 @@ import os
 import dotenv
 import argparse
 from postgres_da_ai_agent.modules.orchestrator.orchestrator import Orchestrator
+from postgres_da_ai_agent.modules.embeddings.embeddings import DatabaseEmbedder
 from postgres_da_ai_agent.modules.db.db import PostgresDB
 from postgres_da_ai_agent.modules.prompts.prompts import (
     get_first_instruction_pompt,
@@ -33,51 +34,64 @@ def main():
     parser.add_argument("--prompt", help="The prompt for the AI model")
     args = parser.parse_args()
 
-    db = PostgresDB()
-    db.connect_with_url(DB_URL)
-    table_definitions = db.get_table_definitions_for_prompt()
+    with PostgresDB() as db:
+        db.connect_with_url(DB_URL)
 
-    prompt = args.prompt
+        # table_definitions = db.get_table_definitions_for_prompt()
 
-    prompt = get_first_instruction_pompt(prompt, table_definitions)
+        map_table_name_to_table_def = db.get_table_definition_map_for_embeddings()
 
-    """
-        Sequential agents
-    """
+        database_embedder = DatabaseEmbedder()
 
-    data_engineering_agents = [
-        admin_user_proxy_agent,
-        data_engineer_agent,
-        sr_data_analyst_agent,
-        product_manager_agent,
-    ]
+        for table_name, table_def in map_table_name_to_table_def.items():
+            database_embedder.add_table(table_name, table_def)
 
-    data_engineer_agent_orchestrator = Orchestrator(
-        name=AGENT_TEAM_NAME,
-        agents=data_engineering_agents,
-    )
+        similar_tables = database_embedder.get_similar_tables(args.prompt)
 
-    success, data_engineer_messages = data_engineer_agent_orchestrator.sequential_conversation(
-        prompt)
+        table_definitions = database_embedder.get_table_definitions_from_names(similar_tables)
 
-    # Here we grab the last message not being APPROVED
-    data_analyst_result = data_engineer_messages[-6]
+        prompt = get_first_instruction_pompt(args.prompt, table_definitions)
 
-    # Broadcasting agents
+        """
+            Sequential agents
+        """
 
-    data_viz_agents = [
-        admin_user_proxy_agent,
-        text_report_agent,
-    ]
+        data_engineering_agents = [
+            admin_user_proxy_agent,
+            data_engineer_agent,
+            sr_data_analyst_agent,
+            product_manager_agent,
+        ]
 
-    data_viz_orchestrator = Orchestrator(
-        name=VIZ_AGENT_TEAM_NAME,
-        agents=data_viz_agents,
-    )
+        data_engineer_agent_orchestrator = Orchestrator(
+            name=AGENT_TEAM_NAME,
+            agents=data_engineering_agents,
+        )
 
-    data_viz_prompt = f"Here is the data to report: {data_analyst_result}"
+        success, data_engineer_messages = data_engineer_agent_orchestrator.sequential_conversation(
+            prompt)
 
-    data_viz_orchestrator.broadcast_conversation(data_viz_prompt)
+        # Here we grab the last message not being APPROVED
+        print("DATA ENGINEER MESSAGES")
+        print(data_engineer_messages)
+        
+        data_analyst_result = data_engineer_messages[-7]["content"]
+
+        # Broadcasting agents
+
+        data_viz_agents = [
+            admin_user_proxy_agent,
+            text_report_agent,
+        ]
+
+        data_viz_orchestrator = Orchestrator(
+            name=VIZ_AGENT_TEAM_NAME,
+            agents=data_viz_agents,
+        )
+
+        data_viz_prompt = f"Here is the data to report: {data_analyst_result}"
+
+        data_viz_orchestrator.broadcast_conversation(data_viz_prompt)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,14 @@
-import psycopg2
-from psycopg2 import sql
+from datetime import datetime
 import json
-import datetime
+import psycopg2
+from psycopg2.sql import SQL, Identifier
 
 
 class PostgresDB:
+    """
+    A class to manage postgres connections and queries
+    """
+
     def __init__(self):
         self.conn = None
         self.cur = None
@@ -12,126 +16,148 @@ class PostgresDB:
     def __enter__(self):
         return self
 
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_val, exc_tb):
         if self.cur:
             self.cur.close()
         if self.conn:
             self.conn.close()
 
-    def datetime_handler(self, obj):
-        if isinstance(obj, datetime.datetime):
-            return obj.isoformat()
-        raise TypeError("Type not serializable")
-
     def connect_with_url(self, url):
         self.conn = psycopg2.connect(url)
         self.cur = self.conn.cursor()
 
-    def upsert(self, table_name, _dict):
-        columns = _dict.keys()
-        values = [sql.Identifier(column) for column in columns]
-        placeholders = [sql.Placeholder(column) for column in columns]
+    def close(self):
+        if self.cur:
+            self.cur.close()
+        if self.conn:
+            self.conn.close()
 
-        upsert_query = sql.SQL("""
-            INSERT INTO {} ({}) VALUES ({})
-            ON CONFLICT (id) DO UPDATE
-            SET ({}) = ROW({})
-        """).format(
-            sql.Identifier(table_name),
-            sql.SQL(', ').join(values),
-            sql.SQL(', ').join(placeholders),
-            sql.SQL(', ').join(values),
-            sql.SQL(', ').join(placeholders)
-        )
-        self.cur.execute(upsert_query, _dict)
-        self.conn.commit()
-
-    def delete(self, table_name, _id):
-        self.cur.execute(
-            "DELETE FROM {} WHERE id = %s".format(table_name), (_id,))
-        self.conn.commit()
-
-    def get(self, table_name, _id):
-        self.cur.execute(
-            "SELECT * FROM {} WHERE id = %s".format(table_name), (_id,))
-        return self.cur.fetchone()
-
-    def get_all(self, table_name):
-        self.cur.execute("SELECT * FROM {}".format(table_name))
-        return self.cur.fetchall()
-
-    def run_sql(self, sql):
+    def run_sql(self, sql) -> str:
+        """
+        Run a SQL query against the postgres database
+        """
         self.cur.execute(sql)
-        column_names = [desc[0] for desc in self.cur.description]
-        result = self.cur.fetchall()
+        columns = [desc[0] for desc in self.cur.description]
+        res = self.cur.fetchall()
 
-        # # Convert rows to dictionaries
-        # dict_result = [dict(zip(column_names, row)) for row in result]
+        list_of_dicts = [dict(zip(columns, row)) for row in res]
 
-        # # Convert list of dictionaries to JSON with custom datetime handler
-        # formatted_result = json.dumps(
-        #     dict_result, indent=4, default=self.datetime_handler)
+        json_result = json.dumps(list_of_dicts, indent=4, default=self.datetime_handler)
 
-        # return formatted_result
-        return result
+        return json_result
 
-    def get_table_definitions(self, table_name):
-        self.cur.execute("""
-            SELECT pg_tables.tablename, pg_tables.schemaname,
-                   pg_tables.tableowner, pg_tables.tablespace,
-                   pg_tables.hasindexes, pg_tables.hasrules,
-                   pg_tables.hastriggers, pg_tables.rowsecurity
-            FROM pg_tables
-            WHERE tablename = %s
-        """, (table_name,))
-        return self.cur.fetchone()
+    def datetime_handler(self, obj):
+        """
+        Handle datetime objects when serializing to JSON.
+        """
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return str(obj)  # or just return the object unchanged, or another default value
+
+    def get_table_definition(self, table_name):
+        """
+        Generate the 'create' definition for a table
+        """
+
+        get_def_stmt = """
+        SELECT pg_class.relname as tablename,
+            pg_attribute.attnum,
+            pg_attribute.attname,
+            format_type(atttypid, atttypmod)
+        FROM pg_class
+        JOIN pg_namespace ON pg_namespace.oid = pg_class.relnamespace
+        JOIN pg_attribute ON pg_attribute.attrelid = pg_class.oid
+        WHERE pg_attribute.attnum > 0
+            AND pg_class.relname = %s
+            AND pg_namespace.nspname = 'public'  -- Assuming you're interested in public schema
+        """
+        self.cur.execute(get_def_stmt, (table_name,))
+        rows = self.cur.fetchall()
+        create_table_stmt = "CREATE TABLE {} (\n".format(table_name)
+        for row in rows:
+            create_table_stmt += "{} {},\n".format(row[2], row[3])
+        create_table_stmt = create_table_stmt.rstrip(",\n") + "\n);"
+        return create_table_stmt
 
     def get_all_table_names(self):
-        self.cur.execute(
-            "SELECT tablename FROM pg_tables WHERE schemaname = 'public'")
+        """
+        Get all table names in the database
+        """
+        get_all_tables_stmt = (
+            "SELECT tablename FROM pg_tables WHERE schemaname = 'public';"
+        )
+        self.cur.execute(get_all_tables_stmt)
         return [row[0] for row in self.cur.fetchall()]
 
-    def get_table_column_definitions(self, table_name):
-        self.cur.execute("""
-            SELECT column_name, data_type, is_nullable, column_default
-            FROM information_schema.columns
-            WHERE table_name = %s
-        """, (table_name,))
-        return self.cur.fetchall()
-
-    def get_foreign_keys(self, table_name):
-        self.cur.execute("""
-            SELECT 
-                kcu.column_name, 
-                ccu.table_name AS foreign_table_name,
-                ccu.column_name AS foreign_column_name
-            FROM 
-                information_schema.table_constraints AS tc 
-                JOIN information_schema.key_column_usage AS kcu
-                    ON tc.constraint_name = kcu.constraint_name
-                JOIN information_schema.constraint_column_usage AS ccu
-                    ON ccu.constraint_name = tc.constraint_name
-            WHERE 
-                tc.constraint_type = 'FOREIGN KEY' AND 
-                tc.table_name = %s;
-        """, (table_name,))
-        return self.cur.fetchall()
-
     def get_table_definitions_for_prompt(self):
+        """
+        Get all table 'create' definitions in the database
+        """
         table_names = self.get_all_table_names()
-        result = []
+        definitions = []
         for table_name in table_names:
-            result.append(f"Table: {table_name}")
-            columns = self.get_table_column_definitions(table_name)
-            for column in columns:
-                col_name, data_type, is_nullable, col_default = column
-                result.append(
-                    f"    {col_name} ({data_type})")
+            definitions.append(self.get_table_definition(table_name))
+        return "\n\n".join(definitions)
 
-            # Add foreign key relationships
-            fks = self.get_foreign_keys(table_name)
-            for fk in fks:
-                col_name, foreign_table_name, foreign_column_name = fk
-                result.append(
-                    f"    FOREIGN KEY ({col_name}) REFERENCES {foreign_table_name}({foreign_column_name})")
-        return "\n".join(result)
+    def get_table_definition_map_for_embeddings(self):
+        """
+        Creates a map of table names to table definitions
+        """
+        table_names = self.get_all_table_names()
+        definitions = {}
+        for table_name in table_names:
+            definitions[table_name] = self.get_table_definition(table_name)
+        return definitions
+
+    def get_related_tables(self, table_list, n=2):
+        """
+        Get tables that have foreign keys referencing the given table
+        """
+
+        related_tables_dict = {}
+
+        for table in table_list:
+            # Query to fetch tables that have foreign keys referencing the given table
+            self.cur.execute(
+                """
+                SELECT 
+                    a.relname AS table_name
+                FROM 
+                    pg_constraint con 
+                    JOIN pg_class a ON a.oid = con.conrelid 
+                WHERE 
+                    confrelid = (SELECT oid FROM pg_class WHERE relname = %s)
+                LIMIT %s;
+                """,
+                (table, n),
+            )
+
+            related_tables = [row[0] for row in self.cur.fetchall()]
+
+            # Query to fetch tables that the given table references
+            self.cur.execute(
+                """
+                SELECT 
+                    a.relname AS referenced_table_name
+                FROM 
+                    pg_constraint con 
+                    JOIN pg_class a ON a.oid = con.confrelid 
+                WHERE 
+                    conrelid = (SELECT oid FROM pg_class WHERE relname = %s)
+                LIMIT %s;
+                """,
+                (table, n),
+            )
+
+            related_tables += [row[0] for row in self.cur.fetchall()]
+
+            related_tables_dict[table] = related_tables
+
+        # convert dict to list and remove dups
+        related_tables_list = []
+        for table, related_tables in related_tables_dict.items():
+            related_tables_list += related_tables
+
+        related_tables_list = list(set(related_tables_list))
+
+        return related_tables_list

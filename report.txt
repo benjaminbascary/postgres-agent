@@ -1,0 +1,31 @@
+Data Report:
+
+1. ID: bc9d617f-9197-41f8-ba94-277fe32db37a
+   Name: Programa test 2
+   Location ID: null
+   Image URL: null
+   Stream URL: null
+
+2. ID: 34e5874d-41a9-4182-98c4-21c2be2b504f
+   Name: test test
+   Location ID: b02064e0-95e1-438c-8c2f-69f8d1d02511
+   Image URL: null
+   Stream URL: null
+
+3. ID: a0431b81-aff5-485d-9606-aad136f012ad
+   Name: Programa test
+   Location ID: null
+   Image URL: uploads/program/bariloche.jpeg
+   Stream URL: null
+
+4. ID: 37f82d94-1ab5-425c-aedd-51c53b40b977
+   Name: Programa de Benja
+   Location ID: 0db1a503-3238-4049-9353-26ec0d662a51
+   Image URL: uploads/program/retroanime-style-anime-version-of-the-person-i-uploaded-in-the-image-to-image-section- (1).png
+   Stream URL: null
+
+5. ID: 03b90a4c-7e37-40f5-a168-4dd5842ea37a
+   Name: RN Radio
+   Location ID: null
+   Image URL: uploads/radio/bariloche.jpeg
+   Stream URL: https://01.solumedia.com.ar:10079

@@ -1,0 +1,7 @@
+I'm sorry for the confusion, but as an AI, I don't have the ability to run SQL queries. However, I can help you construct the SQL query you need. Here's an example of how you can select all data from a table named 'users':
+
+```sql
+SELECT * FROM users;
+```
+
+Please replace 'users' with the actual name of your table.
