@@ -3,6 +3,8 @@ import dotenv
 import argparse
 from postgres_da_ai_agent.modules.orchestrator.orchestrator import Orchestrator
 from postgres_da_ai_agent.modules.embeddings.embeddings import DatabaseEmbedder
+from postgres_da_ai_agent.modules.file.file import write_file
+from postgres_da_ai_agent.modules.utils.utils import get_date
 from postgres_da_ai_agent.modules.db.db import PostgresDB
 from postgres_da_ai_agent.modules.prompts.prompts import (
     get_first_instruction_pompt,
@@ -48,7 +50,8 @@ def main():
 
         similar_tables = database_embedder.get_similar_tables(args.prompt)
 
-        table_definitions = database_embedder.get_table_definitions_from_names(similar_tables)
+        table_definitions = database_embedder.get_table_definitions_from_names(
+            similar_tables)
 
         prompt = get_first_instruction_pompt(args.prompt, table_definitions)
 
@@ -71,27 +74,39 @@ def main():
         success, data_engineer_messages = data_engineer_agent_orchestrator.sequential_conversation(
             prompt)
 
-        # Here we grab the last message not being APPROVED
-        print("DATA ENGINEER MESSAGES")
-        print(data_engineer_messages)
-        
-        data_analyst_result = data_engineer_messages[-7]["content"]
+        # Here we grab, reversed, the last message content that does not contains APPROVED
+        try:
+            date = get_date()
+            data_analyst_result = data_engineer_messages[-7]["content"]
+            print(f"Writing file data_analyst_result_{date}")
+            write_file(f"data_analyst_result_{date}.txt", data_analyst_result)
+        except IndexError:
+            print("No data analyst result found")
+            print("Exiting...")
+            return
 
         # Broadcasting agents
 
-        data_viz_agents = [
-            admin_user_proxy_agent,
-            text_report_agent,
-        ]
+        # data_viz_agents = [
+        #     admin_user_proxy_agent,
+        #     text_report_agent,
+        # ]
 
-        data_viz_orchestrator = Orchestrator(
-            name=VIZ_AGENT_TEAM_NAME,
-            agents=data_viz_agents,
-        )
+        # data_viz_orchestrator = Orchestrator(
+        #     name=VIZ_AGENT_TEAM_NAME,
+        #     agents=data_viz_agents,
+        # )
 
-        data_viz_prompt = f"Here is the data to report: {data_analyst_result}"
+        # data_viz_prompt = f"Here is the data to report: {data_analyst_result}"
 
-        data_viz_orchestrator.broadcast_conversation(data_viz_prompt)
+        # data_viz_orchestrator.broadcast_conversation(data_viz_prompt)
+
+        data_eng_team_cost, data_eng_tokens = data_engineer_agent_orchestrator.get_cost_and_tokens()
+
+        # data_viz_team_cost, data_viz_tokens = data_viz_orchestrator.get_cost_and_tokens()
+
+        print(
+            f"ℹ️ Data eng cost: ${data_eng_team_cost}, Tokens: {data_eng_tokens}")
 
 
 if __name__ == "__main__":

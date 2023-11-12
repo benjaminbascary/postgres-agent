@@ -1,3 +1,4 @@
+from postgres_da_ai_agent.modules.llm.llm import estimate_price_and_tokens
 from typing import List, Optional, Tuple
 import autogen
 
@@ -185,3 +186,29 @@ class Orchestrator:
         print(f"✅ -------- Orchestrator SUCCESSFUL ----------\n\n")
 
         return True, self.messages
+
+    def get_message_as_str(self):
+        """
+        Get all messages as a string
+        """
+
+        messages_as_str = ""
+
+        for message in self.messages:
+            if message is None:
+                continue
+
+            if isinstance(message, dict):
+                content_from_dict = message.get("content", None)
+                func_call_from_dict = message.get("function_call", None)
+                content = content_from_dict or func_call_from_dict
+                if not content:
+                    continue
+                messages_as_str += str(content)
+            else:
+                messages_as_str += str(message)
+
+        return messages_as_str
+
+    def get_cost_and_tokens(self):
+        return estimate_price_and_tokens(self.get_message_as_str())

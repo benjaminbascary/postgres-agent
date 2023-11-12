@@ -1,14 +1,9 @@
-"""
-Purpose:
-    Interact with the OpenAI API.
-    Provide supporting prompt engineering functions.
-"""
-
 import sys
 from dotenv import load_dotenv
 import os
 from typing import Any, Dict
 import openai
+from tiktoken import get_encoding
 
 # load .env file
 load_dotenv()
@@ -85,3 +80,28 @@ def add_cap_ref(
     new_prompt = f"""{prompt} {prompt_suffix}\n\n{cap_ref}\n\n{cap_ref_content}"""
 
     return new_prompt
+
+
+def count_tokens(text: str):
+    """
+    Count the number of tokens in a string.
+    """
+    enc = get_encoding("cl100k_base")
+    return len(enc.encode(text))
+
+
+def estimate_price_and_tokens(text):
+    """
+    Conservative estimate the price and tokens for a given text.
+    """
+    # round up to the output tokens
+    COST_PER_1k_TOKENS = 0.06
+
+    tokens = count_tokens(text)
+
+    estimated_cost = (tokens / 1000) * COST_PER_1k_TOKENS
+
+    # round
+    estimated_cost = round(estimated_cost, 2)
+
+    return estimated_cost, tokens
